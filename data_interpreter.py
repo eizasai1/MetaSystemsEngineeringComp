@@ -19,10 +19,6 @@ class data_interpreter():
 
         self.determine_date_added_bounds()
 
-        self.build_plot_data("rating", "date_added", 10, "Rating in US Frequency", labels=["Year Added", "Number of Movies"], filter={"country": "United States"})
-        self.build_plot_data("rating", "date_added", 10, "Rating in US Frequency", labels=["Year Added", "Number of Movies"])
-        
-
     def build_plot_data(self, x:str, y:str, points:int, title:str, labels:list, filter:dict=None):
         query = self.build_filtered_query(x, y, filter)
         print(query)
@@ -62,7 +58,6 @@ class data_interpreter():
                 query += " JOIN \"%s\" ON %s" % (key, condition)
         query += ";"
         return query
-
 
     def determine_date_added_bounds(self):
         max = float('-inf')
