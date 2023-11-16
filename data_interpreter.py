@@ -24,7 +24,6 @@ class data_interpreter():
         print(query)
         frequent = self.database_query(query)
         parsed_data = self.parse_frequency_data(frequent, True)
-        # print(parsed_data)
         for point in range(len(parsed_data)):
             parsed_data[point] = (parsed_data[point][0], self.fill_in_blank_year_data(parsed_data[point][1]), parsed_data[point][2])
         plot_data = self.get_graph_data(parsed_data[:points])
@@ -50,12 +49,15 @@ class data_interpreter():
             query += " JOIN MOVIE ON MOVIE.ID=\"%s\".MOVIE_ID" % (x)
         if filter != None and len(filter.keys()) > 0:
             for key in filter.keys():
-                condition = "\"%s\"=\"%s\"" % (key, filter[key])
-                if key in self.separate_tables and x in self.separate_tables:
-                    condition = "\"%s\"=\"%s\" AND \"%s\".MOVIE_ID=\"%s\".MOVIE_ID" % (key + "NAME", filter[key], table_name, key)
-                elif key in self.separate_tables:
+                if key in self.separate_tables:
                     condition = "\"%s\"=\"%s\" AND \"%s\".ID=\"%s\".MOVIE_ID" % (key + "NAME", filter[key], table_name, key)
-                query += " JOIN \"%s\" ON %s" % (key, condition)
+                    if x in self.separate_tables:
+                        condition = "\"%s\"=\"%s\" AND \"%s\".MOVIE_ID=\"%s\".MOVIE_ID" % (key + "NAME", filter[key], table_name, key)
+                    query += " JOIN \"%s\" ON %s" % (key, condition)
+        if filter != None and len(filter.keys()) > 0:
+            for key in filter.keys():
+                if not key in self.separate_tables:
+                    query += " WHERE \"%s\"=\"%s\"" % (key, filter[key])
         query += ";"
         return query
 
