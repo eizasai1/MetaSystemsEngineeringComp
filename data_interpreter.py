@@ -49,7 +49,7 @@ class data_interpreter():
             query += " JOIN MOVIE ON MOVIE.ID=\"%s\".MOVIE_ID" % (x)
         if filter != None and len(filter.keys()) > 0:
             for key in filter.keys():
-                if key in self.separate_tables:
+                if key in self.separate_tables and key != x:
                     condition = "\"%s\"=\"%s\" AND \"%s\".ID=\"%s\".MOVIE_ID" % (key + "NAME", filter[key], table_name, key)
                     if x in self.separate_tables:
                         condition = "\"%s\"=\"%s\" AND \"%s\".MOVIE_ID=\"%s\".MOVIE_ID" % (key + "NAME", filter[key], table_name, key)
@@ -58,6 +58,8 @@ class data_interpreter():
             for key in filter.keys():
                 if not key in self.separate_tables:
                     query += " WHERE \"%s\"=\"%s\"" % (key, filter[key])
+                elif key == x:
+                    query += " WHERE \"%s\"=\"%s\"" % (key + "NAME", filter[key])
         query += ";"
         return query
 
