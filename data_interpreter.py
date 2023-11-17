@@ -19,14 +19,14 @@ class data_interpreter():
 
         self.determine_date_added_bounds()
 
-    def build_pie_data(self, x:str, points:int, title:str="", filter:dict=None):
+    def build_pie_data(self, x:str, points:int, title:str="", filter:dict=None, percentage:bool=True):
         query = self.build_filtered_pie_query(x, filter)
         print(query)
         counts = self.database_query(query)
         parsed_data = self.parse_pie_data(counts)
         pie_data = self.get_pie_data(parsed_data[:points])
         title = self.check_title(title, x, "")
-        self.pie_grapher(pie_data[1], pie_data[0], title=title)
+        self.pie_grapher(x.replace("_", " ").capitalize(), pie_data[1], pie_data[0], title=title, percentage=percentage)
 
     def check_title(self, title, x, y):
         if len(title) == 0:
@@ -279,18 +279,26 @@ class data_interpreter():
             plt.legend()
         plt.show()
 
-    def pie_grapher(self, x:list, labels:list, title:str):
+    def original_value_from_percent(self, pct, allvals):
+        absolute = int(np.round(pct/100.*np.sum(allvals)))
+        return str(absolute)
+
+    def pie_grapher(self, x_name:str, x:list, labels:list, title:str, percentage:bool=True):
         plt.title(title)
-        plt.pie(x, labels=labels, autopct='%1.1f%%', startangle=90)
+        if percentage:
+            wedges, texts, autotexts = plt.pie(x, autopct="%1.1f%%", startangle=0)
+        else:
+            wedges, texts, autotexts = plt.pie(x, autopct=lambda pct: self.original_value_from_percent(pct, x), startangle=0)
+        plt.legend(wedges, labels, title=x_name)
         plt.show()
     
     def data_scatter(self, x_data:list, y_data:list, title:str, labels=[], ylabels=[], legend:bool=False):
         plt.title(title)
-        # if len(labels) > 0:
-        #     plt.xlabel(labels[0])
-        #     plt.ylabel(labels[1])
-        # if len(ylabels) == 0:
-        #     ylabels = ["" for i in range(len(y_data))]
+        if len(labels) > 0:
+            plt.xlabel(labels[0])
+            plt.ylabel(labels[1])
+        if len(ylabels) == 0:
+            ylabels = ["" for i in range(len(y_data))]
         plt.grid()
         for y in range(len(y_data)):
             plt.scatter(x_data[y], y_data[y], label=ylabels[y])
