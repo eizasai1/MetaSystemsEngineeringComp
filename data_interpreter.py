@@ -19,6 +19,52 @@ class data_interpreter():
 
         self.determine_date_added_bounds()
 
+    def build_pie_data(self, x:str, points:int, title:str="", filter:dict=None):
+        query = self.build_filtered_pie_query(x, filter)
+        print(query)
+        counts = self.database_query(query)
+        parsed_data = self.parse_pie_data(counts)
+        pie_data = self.get_pie_data(parsed_data[:points])
+        title = self.check_title(title, x, "")
+        self.pie_grapher(pie_data[1], pie_data[0], title=title)
+
+    def check_title(self, title, x, y):
+        if len(title) == 0:
+            if len(y) == 0:
+                return x.capitalize() + " Percentages"
+            else:
+                return x.capitalize + " Versus " + y.capitalize
+        return title
+
+
+    def get_pie_data(self, data:list):
+        return_lists = [[],[]]
+        for point in data:
+            return_lists[0].append(point[0])
+            return_lists[1].append(point[1])
+        return return_lists
+
+    def parse_pie_data(self, data:list):
+        count_dict = {}
+        for point in data:
+            if not point[0] in count_dict.keys():
+                count_dict[point[0]] = 0
+            count_dict[point[0]] += 1
+        count_list = [(key, count_dict[key]) for key in sorted(count_dict.keys(), key=lambda x: -count_dict[x])]
+        return count_list
+
+    def build_filtered_pie_query(self, x:str, filter:dict=None):
+        table_name = x
+        x_data = x
+        if x in self.separate_tables:
+            x_data = x + "NAME"
+        else:
+            table_name = "MOVIE"
+        query = '''SELECT \"%s\" FROM \"%s\"''' % (x_data, table_name)
+        query = self.filter_data(x, filter, table_name, query)
+        query += ";"
+        return query
+
     def build_plot_data(self, x:str, y:str, points:int, title:str, labels:list, filter:dict=None):
         query = self.build_filtered_query(x, y, filter)
         print(query)
@@ -27,6 +73,7 @@ class data_interpreter():
         for point in range(len(parsed_data)):
             parsed_data[point] = (parsed_data[point][0], self.fill_in_blank_year_data(parsed_data[point][1]), parsed_data[point][2])
         plot_data = self.get_graph_data(parsed_data[:points])
+        title = self.check_title(title, x, y)
         self.data_grapher(plot_data[0], plot_data[1], title=title, labels=labels, ylabels=plot_data[2], legend=True)
 
     def fill_in_blank_year_data(self, data):
@@ -37,16 +84,7 @@ class data_interpreter():
         full_data = sorted(full_data, key=lambda x: x[0])
         return [[i[0] for i in full_data],[i[1] for i in full_data]]
 
-    def build_filtered_query(self, x:str, y:str, filter:dict=None):
-        table_name = x
-        x_data = x
-        if x in self.separate_tables:
-            x_data = x + "NAME"
-        else:
-            table_name = "MOVIE"
-        query = '''SELECT \"%s\", \"%s\" FROM \"%s\"''' % (x_data, y, table_name)
-        if not y in self.separate_tables and x in self.separate_tables:
-            query += " JOIN MOVIE ON MOVIE.ID=\"%s\".MOVIE_ID" % (x)
+    def filter_data(self, x, filter, table_name, query):
         if filter != None and len(filter.keys()) > 0:
             for key in filter.keys():
                 if key in self.separate_tables and key != x:
@@ -60,6 +98,19 @@ class data_interpreter():
                     query += " WHERE \"%s\"=\"%s\"" % (key, filter[key])
                 elif key == x:
                     query += " WHERE \"%s\"=\"%s\"" % (key + "NAME", filter[key])
+        return query
+
+    def build_filtered_query(self, x:str, y:str, filter:dict=None):
+        table_name = x
+        x_data = x
+        if x in self.separate_tables:
+            x_data = x + "NAME"
+        else:
+            table_name = "MOVIE"
+        query = '''SELECT \"%s\", \"%s\" FROM \"%s\"''' % (x_data, y, table_name)
+        if not y in self.separate_tables and x in self.separate_tables:
+            query += " JOIN MOVIE ON MOVIE.ID=\"%s\".MOVIE_ID" % (x)
+        query = self.filter_data(x, filter, table_name, query)
         query += ";"
         return query
 
@@ -218,4 +269,9 @@ class data_interpreter():
             plt.plot(x_data[y], y_data[y], label=ylabels[y])
         if legend:
             plt.legend()
+        plt.show()
+
+    def pie_grapher(self, x:list, labels:list, title:str):
+        plt.title(title)
+        plt.pie(x, labels=labels, autopct='%1.1f%%', startangle=90)
         plt.show()
