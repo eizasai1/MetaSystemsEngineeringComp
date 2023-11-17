@@ -31,11 +31,15 @@ class data_interpreter():
     def check_title(self, title, x, y):
         if len(title) == 0:
             if len(y) == 0:
-                return x.capitalize() + " Percentages"
+                return x.replace("_", " ").capitalize() + " Percentages"
             else:
-                return x.capitalize + " Versus " + y.capitalize
+                return x.replace("_", " ").capitalize() + " Versus " + y.replace("_", " ").capitalize()
         return title
 
+    def check_labels(self, labels:list, y:str):
+        if len(labels) < 2:
+            return [y.replace("_", " ").capitalize(), "Number of Movies"]
+        return labels
 
     def get_pie_data(self, data:list):
         return_lists = [[],[]]
@@ -65,7 +69,7 @@ class data_interpreter():
         query += ";"
         return query
 
-    def build_plot_data(self, x:str, y:str, points:int, title:str, labels:list, filter:dict=None):
+    def build_plot_data(self, x:str, y:str, points:int, labels:list=[], title:str="", filter:dict=None, scatter:bool=False):
         query = self.build_filtered_query(x, y, filter)
         print(query)
         frequent = self.database_query(query)
@@ -74,7 +78,11 @@ class data_interpreter():
             parsed_data[point] = (parsed_data[point][0], self.fill_in_blank_year_data(parsed_data[point][1]), parsed_data[point][2])
         plot_data = self.get_graph_data(parsed_data[:points])
         title = self.check_title(title, x, y)
-        self.data_grapher(plot_data[0], plot_data[1], title=title, labels=labels, ylabels=plot_data[2], legend=True)
+        labels = self.check_labels(labels, y)
+        if scatter:
+            self.data_scatter(plot_data[0], plot_data[1], title=title, labels=labels, ylabels=plot_data[2], legend=True)
+        else:
+            self.data_plotter(plot_data[0], plot_data[1], title=title, labels=labels, ylabels=plot_data[2], legend=True)
 
     def fill_in_blank_year_data(self, data):
         full_data = [(data[0][i], data[1][i]) for i in range(len(data[0]))]
@@ -257,7 +265,7 @@ class data_interpreter():
         database.commit()
         database.close()
 
-    def data_grapher(self, x_data:list, y_data:list, title:str, labels=[], ylabels=[], legend:bool=False):
+    def data_plotter(self, x_data:list, y_data:list, title:str, labels=[], ylabels=[], legend:bool=False):
         plt.title(title)
         if len(labels) > 0:
             plt.xlabel(labels[0])
@@ -274,4 +282,18 @@ class data_interpreter():
     def pie_grapher(self, x:list, labels:list, title:str):
         plt.title(title)
         plt.pie(x, labels=labels, autopct='%1.1f%%', startangle=90)
+        plt.show()
+    
+    def data_scatter(self, x_data:list, y_data:list, title:str, labels=[], ylabels=[], legend:bool=False):
+        plt.title(title)
+        # if len(labels) > 0:
+        #     plt.xlabel(labels[0])
+        #     plt.ylabel(labels[1])
+        # if len(ylabels) == 0:
+        #     ylabels = ["" for i in range(len(y_data))]
+        plt.grid()
+        for y in range(len(y_data)):
+            plt.scatter(x_data[y], y_data[y], label=ylabels[y])
+        if legend:
+            plt.legend()
         plt.show()
