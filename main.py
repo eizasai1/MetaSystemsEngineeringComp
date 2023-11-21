@@ -6,16 +6,33 @@ if __name__=="__main__":
 
     ignore_columns = ["show_id", "title", "description"]
 
+    country_data = di.build_plot_data("country", "date_added", 10)
+    countries = country_data[-1]
+    print(countries)
+
+    ignore_columns.append("country")
+
+    for country in countries:
+        for column in columns:
+            if not column in ignore_columns:
+                di.build_plot_data(column, "date_added", 10, title=country + " " + column, filter={"country":country})
+                di.build_pie_data(column, 10, title=country + " " + column, filter={"country":country})
+
     # for column in columns:
     #     if not column in ignore_columns:
     #         di.build_plot_data(column, "date_added", 10)
     #         di.build_pie_data(column, 10)    
     
-    ignore_columns = ["show_id", "title", "description", "director", "cast"]
-    for column in columns:
-        if not column in ignore_columns:
-            set = di.get_filter_options_for_column(column)
-            print(column, set)
+    # ignore_columns = ["show_id", "title", "description", "director", "cast"]
+    # for column in columns:
+    #     if not column in ignore_columns:
+    #         set = di.get_filter_options_for_column(column)
+    #         print(column, set)
+
+    # di.build_plot_data("duration", "date_added", 10, filter={"type":"Movie"})
+    # di.build_pie_data("duration", 10, filter={"type":"Movie"})
+    # di.build_plot_data("duration", "date_added", 10, filter={"type":"TV Show"})
+    # di.build_pie_data("duration", 10, filter={"type":"TV Show"})
 
 
     # di.build_plot_data("rating", "date_added", 10, filter={"country": "United States"})

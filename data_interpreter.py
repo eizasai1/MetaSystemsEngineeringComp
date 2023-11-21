@@ -49,6 +49,7 @@ class data_interpreter():
         pie_data = self.get_pie_data(parsed_data[:points])
         title = self.check_title(title, x, "")
         self.pie_grapher(x.replace("_", " ").capitalize(), pie_data[1], pie_data[0], title=title, percentage=percentage)
+        return pie_data
 
     def check_title(self, title, x, y):
         if len(title) == 0:
@@ -110,6 +111,7 @@ class data_interpreter():
             self.data_scatter(plot_data[0], plot_data[1], title=title, labels=labels, ylabels=plot_data[2], legend=True)
         else:
             self.data_plotter(plot_data[0], plot_data[1], title=title, labels=labels, ylabels=plot_data[2], legend=True)
+        return plot_data
 
     def fill_in_blank_year_data(self, data):
         full_data = [(data[0][i], data[1][i]) for i in range(len(data[0]))]
