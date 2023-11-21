@@ -4,7 +4,7 @@ if __name__=="__main__":
     di = data_interpreter.data_interpreter("netflix_titles.csv", "MOVIE", ["director", "cast", "country", "listed_in"])
     columns = di.get_table_columns()
 
-    ignore_columns = ["show_id", "title", "description"]
+    ignore_columns = ["show_id", "title", "description", "date_added"]
 
     country_data = di.build_plot_data("country", "date_added", 10)
     countries = country_data[-1]
