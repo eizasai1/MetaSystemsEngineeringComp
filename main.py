@@ -15,8 +15,8 @@ if __name__=="__main__":
     for country in countries:
         for column in columns:
             if not column in ignore_columns:
-                di.build_plot_data(column, "date_added", 10, title=country + " " + column, filter={"country":country})
-                di.build_pie_data(column, 10, title=country + " " + column, filter={"country":country})
+                di.build_plot_data(column, "date_added", 10, title=country + " " + column.replace("_", " "), filter={"country":country})
+                di.build_pie_data(column, 10, title=country + " " + column.replace("_", " "), filter={"country":country})
 
     # for column in columns:
     #     if not column in ignore_columns:
