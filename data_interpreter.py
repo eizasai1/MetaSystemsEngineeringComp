@@ -7,13 +7,14 @@ import sqlite3
 class data_interpreter():
     table=None
     sqlite_table="test.db"
-    separate_tables=["director", "cast", "country", "listed_in"]
+    separate_tables=[]
     main_table_name=""
     date_added_bounds=[]
 
-    def __init__(self, file_name:str, main_table_name:str):
+    def __init__(self, file_name:str, main_table_name:str, separate_tables:list):
         self.table = pd.read_csv(file_name)
         self.main_table_name = main_table_name
+        self.separate_tables = separate_tables
         print(self.table.columns)
         self.drop_tables()
         self.intialize_database()
@@ -21,11 +22,14 @@ class data_interpreter():
 
         self.determine_date_added_bounds()
 
+    def get_table_columns(self):
+        return self.table.columns
+
     def build_pie_data(self, x:str, points:int, title:str="", filter:dict=None, omit:dict=None, percentage:bool=True):
         query = self.build_filtered_pie_query(x, filter, omit)
         print(query)
         counts = self.database_query(query)
-        parsed_data = self.parse_pie_data(counts)
+        parsed_data = self.parse_pie_data(counts, x=="duration")
         pie_data = self.get_pie_data(parsed_data[:points])
         title = self.check_title(title, x, "")
         self.pie_grapher(x.replace("_", " ").capitalize(), pie_data[1], pie_data[0], title=title, percentage=percentage)
@@ -50,12 +54,16 @@ class data_interpreter():
             return_lists[1].append(point[1])
         return return_lists
 
-    def parse_pie_data(self, data:list):
+    def parse_pie_data(self, data:list, is_duration:bool=False):
         count_dict = {}
         for point in data:
-            if not point[0] in count_dict.keys():
-                count_dict[point[0]] = 0
-            count_dict[point[0]] += 1
+            field = point[0]
+            if is_duration:
+                if field.endswith("min"):
+                    field = str((int(field.split(" ")[0]) // 30)*30) + "-" + str((int(field.split(" ")[0]) // 30)*30 + 30) + " mins"
+            if not field in count_dict.keys():
+                count_dict[field] = 0
+            count_dict[field] += 1
         count_list = [(key, count_dict[key]) for key in sorted(count_dict.keys(), key=lambda x: -count_dict[x])]
         return count_list
 
@@ -76,7 +84,7 @@ class data_interpreter():
         query = self.build_filtered_query(x, y, filter, omit)
         print(query)
         frequent = self.database_query(query)
-        parsed_data = self.parse_frequency_data(frequent, True)
+        parsed_data = self.parse_frequency_data(frequent, True, x=="duration")
         for point in range(len(parsed_data)):
             parsed_data[point] = (parsed_data[point][0], self.fill_in_blank_year_data(parsed_data[point][1]), parsed_data[point][2])
         plot_data = self.get_graph_data(parsed_data[:points])
@@ -106,7 +114,7 @@ class data_interpreter():
         if not y in self.separate_tables and x in self.separate_tables:
             query += " JOIN \"%s\" ON %s.ID=\"%s\".%s_ID" % (self.main_table_name, self.main_table_name, x, self.main_table_name)
         query = self.filter_data(x, filter, omit, table_name, query)
-        query = '''SELECT %s, %s FROM (%s);''' % (x_data, y, query)
+        query = '''SELECT \"%s\", \"%s\" FROM (%s);''' % (x_data, y, query)
         return query
 
     def filter_data(self, x:str, filter:dict, omit:dict, table_name:str, query:str):
@@ -193,18 +201,22 @@ class data_interpreter():
         y_labels = [i[0] for i in data]
         return x_data, y_data, y_labels
 
-    def parse_frequency_data(self, data:list, is_date_added:bool=False):
+    def parse_frequency_data(self, data:list, is_date_added:bool=False, is_duration:bool=False):
         freq_dict = {}
         for point in data:
             y_field = point[1]
+            x_field = point[0]
+            if is_duration:
+                if x_field.endswith("min"):
+                    x_field = str((int(x_field.split(" ")[0]) // 30)*30) + "-" + str((int(x_field.split(" ")[0]) // 30)*30 + 30) + " mins"
             try:
                 if is_date_added:
                     y_field = int(y_field[-4:])
-                if not point[0] in freq_dict.keys():
-                    freq_dict[point[0]] = {}
-                if not y_field in freq_dict[point[0]].keys():
-                    freq_dict[point[0]][y_field] = 0
-                freq_dict[point[0]][y_field] += 1
+                if not x_field in freq_dict.keys():
+                    freq_dict[x_field] = {}
+                if not y_field in freq_dict[x_field].keys():
+                    freq_dict[x_field][y_field] = 0
+                freq_dict[x_field][y_field] += 1
             except ValueError:
                 pass
         return_list = []            
