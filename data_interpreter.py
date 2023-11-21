@@ -8,10 +8,12 @@ class data_interpreter():
     table=None
     sqlite_table="test.db"
     separate_tables=["director", "cast", "country", "listed_in"]
+    main_table_name=""
     date_added_bounds=[]
 
-    def __init__(self, file_name:str):
+    def __init__(self, file_name:str, main_table_name:str):
         self.table = pd.read_csv(file_name)
+        self.main_table_name = main_table_name
         print(self.table.columns)
         self.drop_tables()
         self.intialize_database()
@@ -19,8 +21,8 @@ class data_interpreter():
 
         self.determine_date_added_bounds()
 
-    def build_pie_data(self, x:str, points:int, title:str="", filter:dict=None, percentage:bool=True):
-        query = self.build_filtered_pie_query(x, filter)
+    def build_pie_data(self, x:str, points:int, title:str="", filter:dict=None, omit:dict=None, percentage:bool=True):
+        query = self.build_filtered_pie_query(x, filter, omit)
         print(query)
         counts = self.database_query(query)
         parsed_data = self.parse_pie_data(counts)
@@ -57,20 +59,21 @@ class data_interpreter():
         count_list = [(key, count_dict[key]) for key in sorted(count_dict.keys(), key=lambda x: -count_dict[x])]
         return count_list
 
-    def build_filtered_pie_query(self, x:str, filter:dict=None):
+    def build_filtered_pie_query(self, x:str, filter:dict=None, omit:dict=None):
         table_name = x
         x_data = x
         if x in self.separate_tables:
             x_data = x + "NAME"
         else:
-            table_name = "MOVIE"
-        query = '''SELECT \"%s\" FROM \"%s\"''' % (x_data, table_name)
-        query = self.filter_data(x, filter, table_name, query)
+            table_name = self.main_table_name
+        query = '''SELECT * FROM \"%s\"''' % (table_name)
+        query = self.filter_data(x, filter, omit, table_name, query)
+        query = '''SELECT \"%s\" FROM (%s)''' % (x_data, query)
         query += ";"
         return query
 
-    def build_plot_data(self, x:str, y:str, points:int, labels:list=[], title:str="", filter:dict=None, scatter:bool=False):
-        query = self.build_filtered_query(x, y, filter)
+    def build_plot_data(self, x:str, y:str, points:int, labels:list=[], title:str="", filter:dict=None, omit:dict=None, scatter:bool=False):
+        query = self.build_filtered_query(x, y, filter, omit)
         print(query)
         frequent = self.database_query(query)
         parsed_data = self.parse_frequency_data(frequent, True)
@@ -92,34 +95,82 @@ class data_interpreter():
         full_data = sorted(full_data, key=lambda x: x[0])
         return [[i[0] for i in full_data],[i[1] for i in full_data]]
 
-    def filter_data(self, x, filter, table_name, query):
-        if filter != None and len(filter.keys()) > 0:
-            for key in filter.keys():
-                if key in self.separate_tables and key != x:
-                    condition = "\"%s\"=\"%s\" AND \"%s\".ID=\"%s\".MOVIE_ID" % (key + "NAME", filter[key], table_name, key)
-                    if x in self.separate_tables:
-                        condition = "\"%s\"=\"%s\" AND \"%s\".MOVIE_ID=\"%s\".MOVIE_ID" % (key + "NAME", filter[key], table_name, key)
-                    query += " JOIN \"%s\" ON %s" % (key, condition)
-        if filter != None and len(filter.keys()) > 0:
-            for key in filter.keys():
-                if not key in self.separate_tables:
-                    query += " WHERE \"%s\"=\"%s\"" % (key, filter[key])
-                elif key == x:
-                    query += " WHERE \"%s\"=\"%s\"" % (key + "NAME", filter[key])
-        return query
-
-    def build_filtered_query(self, x:str, y:str, filter:dict=None):
+    def build_filtered_query(self, x:str, y:str, filter:dict=None, omit:dict=None):
         table_name = x
         x_data = x
         if x in self.separate_tables:
             x_data = x + "NAME"
         else:
-            table_name = "MOVIE"
-        query = '''SELECT \"%s\", \"%s\" FROM \"%s\"''' % (x_data, y, table_name)
+            table_name = self.main_table_name
+        query = '''SELECT * FROM \"%s\"''' % (table_name)
         if not y in self.separate_tables and x in self.separate_tables:
-            query += " JOIN MOVIE ON MOVIE.ID=\"%s\".MOVIE_ID" % (x)
-        query = self.filter_data(x, filter, table_name, query)
-        query += ";"
+            query += " JOIN \"%s\" ON %s.ID=\"%s\".%s_ID" % (self.main_table_name, self.main_table_name, x, self.main_table_name)
+        query = self.filter_data(x, filter, omit, table_name, query)
+        query = '''SELECT %s, %s FROM (%s);''' % (x_data, y, query)
+        return query
+
+    def filter_data(self, x:str, filter:dict, omit:dict, table_name:str, query:str):
+        if filter != None and len(filter.keys()) > 0:
+            query = self.filter_sep_table(x, filter, table_name, query)
+            query = self.filter_main_table(filter, query)
+        if omit != None and len(omit.keys()) > 0:
+            query = self.omit_data(x, table_name, omit, query)
+        return query
+
+    def omit_data(self, x:str, table_name:str, omit:dict, query:str):
+        for key in omit.keys():
+            if key in self.separate_tables and key != x:
+                if type(omit[key]) == list:
+                    condition = "("
+                    for element in omit[key]:
+                        condition += "\"%s\"<>\"%s\" AND " % (key + "NAME", element)
+                    condition = condition[:-5] + ")"
+                else:
+                    condition = "\"%s\"<>\"%s\"" % (key + "NAME", omit[key])
+                if x in self.separate_tables:
+                    condition = "%s AND \"%s\".%s_ID=\"%s\".%s_ID" % (condition, table_name, self.main_table_name, key, self.main_table_name)
+                else:
+                    condition = "%s AND \"%s\".ID=\"%s\".%s_ID" % (condition, table_name, key, self.main_table_name)
+                query += " JOIN \"%s\" ON %s" % (key, condition)
+        try:
+            omit[table_name]
+            key = table_name
+            if table_name == self.main_table_name:
+                query = " SELECT * FROM (%s) WHERE \"%s\"<>\"%s\"" % (self.main_table_name, query, key, omit[key])
+            else:
+                query = ''' SELECT * FROM \"%s\", (%s) WHERE \"%s\".%s_ID=ID''' % (key, query, key, self.main_table_name)        
+        except KeyError:
+            pass
+        return query
+
+    def filter_main_table(self, filter, query):        
+        for key in filter.keys():
+            if not key in self.separate_tables:
+                query += " WHERE \"%s\"=\"%s\"" % (key, filter[key])
+            elif key == "only_data_for":
+                query += " WHERE \"%s\"=\"%s\"" % (key + "NAME", filter[key])
+        return query
+
+    def filter_sep_table(self, x, filter, table_name, query):
+        x_key = False
+        for key in filter.keys():
+            if key in self.separate_tables and key != x:
+                if type(filter[key]) == list:
+                    condition = "("
+                    for element in filter[key]:
+                        condition += "\"%s\"=\"%s\" OR " % (key + "NAME", element)
+                    condition = condition[:-4] + ")"
+                else:
+                    condition = "\"%s\"=\"%s\"" % (key + "NAME", filter[key])
+                if x in self.separate_tables:
+                    condition = "%s AND \"%s\".%s_ID=\"%s\".%s_ID" % (condition, table_name, self.main_table_name, key, self.main_table_name)
+                else:
+                    condition = "%s AND \"%s\".ID=\"%s\".%s_ID" % (condition, table_name, key, self.main_table_name)
+                query += " JOIN \"%s\" ON %s" % (key, condition)
+            elif key == x:
+                x_key = True       
+        if x_key:
+            query = '''SELECT * FROM \"%s\", (%s) WHERE \"%s\".%s_ID=ID''' % (key, query, key, self.main_table_name)
         return query
 
     def determine_date_added_bounds(self):
@@ -177,17 +228,17 @@ class data_interpreter():
         for row in range(len(self.table)):
             current = self.table.iloc[row]
             for column in self.separate_tables:
-                foreign_key = connection.execute("SELECT * FROM \"MOVIE\" WHERE show_id=\"%s\"" % (current.get("show_id"))).fetchall()[0][0]
+                foreign_key = connection.execute("SELECT * FROM \"%s\" WHERE show_id=\"%s\"" % (self.main_table_name, current.get("show_id"))).fetchall()[0][0]
                 names = str(current.get(column)).replace("'", "''").split(",")
                 for name in names:
                     if name != "nan":
                         name = name.strip()
-                        execute_string = '''INSERT INTO %s (\"MOVIE_ID\", \"%sNAME\") VALUES ('%s', '%s')''' % (column, column, foreign_key, name)
+                        execute_string = '''INSERT INTO %s (\"%s_ID\", \"%sNAME\") VALUES ('%s', '%s')''' % (column, self.main_table_name, column, foreign_key, name)
                         connection.execute(execute_string)
         self.close_database(connection)
 
     def build_execute_string(self):
-        execute_string = "INSERT INTO \"MOVIE\" ("
+        execute_string = "INSERT INTO \"%s\" (" % (self.main_table_name)
         for column in self.table.columns:
             if not column in self.separate_tables:
                 execute_string += column + ","
@@ -210,7 +261,7 @@ class data_interpreter():
 
     def drop_tables(self):
         try:
-            self.database_execute_query("DROP TABLE \"MOVIE\";")
+            self.database_execute_query("DROP TABLE \"%s\";"  % (self.main_table_name))
         except sqlite3.OperationalError as e:
             print(e)
         for sub_table in self.separate_tables:
@@ -221,8 +272,8 @@ class data_interpreter():
 
     def intialize_database(self):
         try:
-            execute_string = '''CREATE TABLE \"MOVIE\" (
-                ID INTEGER PRIMARY KEY,'''
+            execute_string = '''CREATE TABLE \"%s\" (
+                ID INTEGER PRIMARY KEY,''' % (self.main_table_name)
             for column in self.table.columns:
                 if not column in self.separate_tables:
                     if column == "show_id":
@@ -240,12 +291,12 @@ class data_interpreter():
             try:
                 self.database_execute_query(
                     '''CREATE TABLE \"%s\"(
-                        ID INTEGER PRIMARY KEY,
-                        MOVIE_ID INT,
+                        %sID INTEGER PRIMARY KEY,
+                        %s_ID INT,
                         %sNAME VARCHAR(100) NOT NULL,
-                        FOREIGN KEY (MOVIE_ID) REFERENCES MOVIE (ID)
+                        FOREIGN KEY (%s_ID) REFERENCES %s (ID)
                         )
-                        ''' % (sub_table, sub_table)
+                        ''' % (sub_table, sub_table, self.main_table_name, sub_table, self.main_table_name, self.main_table_name)
             ) 
             except sqlite3.OperationalError as e:
                 print(e)
