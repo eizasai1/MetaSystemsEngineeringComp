@@ -22,6 +22,22 @@ class data_interpreter():
 
         self.determine_date_added_bounds()
 
+    def get_filter_options_for_column(self, column:str):
+        if column in self.separate_tables:
+            result = self.database_query("SELECT %s FROM %s" % (column + "NAME", column))
+        else:
+            result = self.database_query("SELECT %s FROM %s" % (column, self.main_table_name))
+        hash_set = set()
+        for row in result:
+            new_item = row[0]
+            if column == "duration":
+                if new_item.endswith("min"):
+                    new_item = str((int(new_item.split(" ")[0]) // 30)*30) + "-" + str((int(new_item.split(" ")[0]) // 30)*30 + 30) + " mins"
+            elif column == "date_added":
+                new_item = new_item[-4:]
+            hash_set.add(new_item)
+        return hash_set
+
     def get_table_columns(self):
         return self.table.columns
 

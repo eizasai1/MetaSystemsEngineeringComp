@@ -3,9 +3,20 @@ import data_interpreter
 if __name__=="__main__":
     di = data_interpreter.data_interpreter("netflix_titles.csv", "MOVIE", ["director", "cast", "country", "listed_in"])
     columns = di.get_table_columns()
-    for column in range(1, len(columns) - 1):
-        di.build_plot_data(columns[column], "date_added", 10)
-        di.build_pie_data(columns[column], 10)
+
+    ignore_columns = ["show_id", "title", "description"]
+
+    # for column in columns:
+    #     if not column in ignore_columns:
+    #         di.build_plot_data(column, "date_added", 10)
+    #         di.build_pie_data(column, 10)    
+    
+    ignore_columns = ["show_id", "title", "description", "director", "cast"]
+    for column in columns:
+        if not column in ignore_columns:
+            set = di.get_filter_options_for_column(column)
+            print(column, set)
+
 
     # di.build_plot_data("rating", "date_added", 10, filter={"country": "United States"})
     # di.build_plot_data("rating", "date_added", 10)
