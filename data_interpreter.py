@@ -370,7 +370,7 @@ class data_interpreter():
             wedges, texts, autotexts = plt.pie(x, autopct="%1.1f%%", startangle=0)
         else:
             wedges, texts, autotexts = plt.pie(x, autopct=lambda pct: self.original_value_from_percent(pct, x), startangle=0)
-        plt.legend(wedges, labels, title=x_name)
+        plt.legend(wedges, labels, title=x_name, loc="upper right")
         plt.show()
     
     def data_scatter(self, x_data:list, y_data:list, title:str, labels=[], ylabels=[], legend:bool=False):
