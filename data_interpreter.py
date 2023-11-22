@@ -65,6 +65,19 @@ class data_interpreter():
     def get_table_columns(self):
         return self.table.columns
 
+    def build_bar_data(self, x:str, points:int, title:str="", filter:dict=None, omit:dict=None, show:bool=True):
+        query = self.build_filtered_pie_query(x, filter, omit)
+        print(query)
+        counts = self.database_query(query)
+        parsed_data = self.parse_pie_data(counts, x=="duration")
+        bar_data = self.get_pie_data(parsed_data[:points])
+        title = self.check_title(title, x, "", bar=True)
+        self.bar_grapher(x.replace("_", " ").capitalize(), bar_data[1], bar_data[0], title=title)
+        if show:      
+            plt.get_current_fig_manager().set_window_title(title)
+            plt.show()
+        return bar_data
+
     def build_pie_data(self, x:str, points:int, title:str="", filter:dict=None, omit:dict=None, percentage:bool=True, show:bool=True):
         query = self.build_filtered_pie_query(x, filter, omit)
         print(query)
@@ -72,14 +85,19 @@ class data_interpreter():
         parsed_data = self.parse_pie_data(counts, x=="duration")
         pie_data = self.get_pie_data(parsed_data[:points])
         title = self.check_title(title, x, "")
-        self.pie_grapher(x.replace("_", " ").capitalize(), pie_data[1], pie_data[0], title=title, percentage=percentage)
-        if show:
+        wedges = self.pie_grapher(x.replace("_", " ").capitalize(), pie_data[1], pie_data[0], title=title, percentage=percentage)
+        if show:      
+            plt.subplots_adjust(left=0.0, bottom=0.1, right=0.45)
+            plt.legend(wedges, pie_data[0], title=title, bbox_to_anchor=(0.6, 0.5), loc="center right", fontsize=10, bbox_transform=plt.gcf().transFigure)
+            plt.get_current_fig_manager().set_window_title(title)
             plt.show()
         return pie_data
 
-    def check_title(self, title, x, y):
+    def check_title(self, title, x, y, bar=False):
         if len(title) == 0:
-            if len(y) == 0:
+            if bar:
+                return "Number of " + self.main_table_name.lower().capitalize() +  "s per " + x.replace("_", " ").capitalize()
+            elif len(y) == 0:
                 return x.replace("_", " ").capitalize() + " Percentages"
             else:
                 return x.replace("_", " ").capitalize() + " Versus " + y.replace("_", " ").capitalize()
@@ -104,6 +122,9 @@ class data_interpreter():
             if is_duration:
                 if field.endswith("min"):
                     field = str((int(field.split(" ")[0]) // 30)*30) + "-" + str((int(field.split(" ")[0]) // 30)*30 + 30) + " mins"
+                if field.endswith("Seasons"):
+                    if int(field.split(" ")[0]) > 1:
+                        field = "Multi-Season"
             if not field in count_dict.keys():
                 count_dict[field] = 0
             count_dict[field] += 1
@@ -138,6 +159,7 @@ class data_interpreter():
         else:
             self.data_plotter(plot_data[0], plot_data[1], title=title, labels=labels, ylabels=plot_data[2], legend=True)
         if show:
+            plt.get_current_fig_manager().set_window_title(title)
             plt.show()
         return plot_data
 
@@ -166,7 +188,7 @@ class data_interpreter():
     def filter_data(self, x:str, filter:dict, omit:dict, table_name:str, query:str):
         if filter != None and len(filter.keys()) > 0:
             query = self.filter_sep_table(x, filter, table_name, query)
-            query = self.filter_main_table(filter, query)
+            query = self.filter_main_table(x, filter, query)
         if omit != None and len(omit.keys()) > 0:
             query = self.omit_data(x, table_name, omit, query)
         return query
@@ -192,15 +214,16 @@ class data_interpreter():
             if table_name == self.main_table_name:
                 query = " SELECT * FROM (%s) WHERE \"%s\"<>\"%s\"" % (self.main_table_name, query, key, omit[key])
             else:
-                query = ''' SELECT * FROM \"%s\", (%s) WHERE \"%s\".%s_ID=ID''' % (key, query, key, self.main_table_name)        
+                query = '''%s WHERE \"%s\"<>\"%s\"''' % (query, key + "NAME", omit[key])        
         except KeyError:
             pass
         return query
 
-    def filter_main_table(self, filter, query):        
+    def filter_main_table(self, x, filter, query):        
         for key in filter.keys():
+            condition = ""
             if not key in self.separate_tables:
-                query += " WHERE \"%s\"=\"%s\"" % (key, filter[key])
+                condition += " WHERE \"%s\"=\"%s\"" % (key, filter[key])
             elif key == "only_data_for":
                 query += " WHERE \"%s\"=\"%s\"" % (key + "NAME", filter[key])
         return query
@@ -224,7 +247,10 @@ class data_interpreter():
             elif key == x:
                 x_key = True       
         if x_key:
-            query = '''SELECT * FROM \"%s\", (%s) WHERE \"%s\".%s_ID=ID''' % (key, query, key, self.main_table_name)
+            if not x in self.separate_tables:
+                query = '''SELECT * FROM \"%s\", (%s) WHERE \"%s\".%s_ID=ID''' % (self.main_table_name, query, x, self.main_table_name)
+            else:
+                query = '''SELECT * FROM (%s) WHERE \"%s\"=\"%s\"''' % (query, x, filter[x])
         return query
 
     def determine_date_added_bounds(self):
@@ -255,6 +281,9 @@ class data_interpreter():
             if is_duration:
                 if x_field.endswith("min"):
                     x_field = str((int(x_field.split(" ")[0]) // 30)*30) + "-" + str((int(x_field.split(" ")[0]) // 30)*30 + 30) + " mins"
+                if x_field.endswith("Seasons"):
+                    if int(x_field.split(" ")[0]) > 1:
+                        x_field = "Multi-Season"
             try:
                 if is_date_added:
                     y_field = int(y_field[-4:])
@@ -400,7 +429,16 @@ class data_interpreter():
         else:
             wedges, texts, autotexts = plt.pie(x, autopct=lambda pct: self.original_value_from_percent(pct, x), startangle=0)
         plt.legend(wedges, labels, title=x_name, loc="upper right", fontsize=8)
+        return wedges
     
+    def bar_grapher(self, x_name:str, x:list, labels:list, title:str, percentage:bool=True):
+        fig, ax = plt.subplots()
+        plt.title(title)
+        p = ax.bar(x=np.arange(len(x)), height=x, width=0.6)
+        plt.ylabel("Number of %s" % (self.main_table_name.lower().capitalize() + "s"))
+        ax.set_xticks(ticks=np.arange(len(x)), labels=labels, fontsize=10)
+        plt.bar(x=[i for i in range(len(x))], height=x)
+
     def data_scatter(self, x_data:list, y_data:list, title:str, labels=[], ylabels=[], legend:bool=False):
         plt.subplot(self.subplot_count[0], self.subplot_count[1], self.subplot_count[2])
         plt.title(title)
