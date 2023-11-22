@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import math
 import os
 import sqlite3
 
@@ -10,6 +11,7 @@ class data_interpreter():
     separate_tables=[]
     main_table_name=""
     date_added_bounds=[]
+    subplot_count=[1, 1, 1]
 
     def __init__(self, file_name:str, main_table_name:str, separate_tables:list):
         self.table = pd.read_csv(file_name)
@@ -21,6 +23,28 @@ class data_interpreter():
         self.fill_database()
 
         self.determine_date_added_bounds()
+
+    def pie_multiple_graphs_with_different_filter(self, x:str, points:int, filter:list, filter_item:str):
+        columns = math.ceil(len(filter) / 2)
+        self.subplot_count = [2, columns, 1]
+        plt.subplots_adjust(left=0.01, bottom=0.01, right=0.99, top=0.99, wspace=0.01, hspace=0.01)
+        for item in filter:
+            self.build_pie_data(x, points, title=item.replace("_", " ") + " " + x.replace("_", " "), filter={filter_item:item}, show=False)
+            self.subplot_count[2] += 1
+        plt.show()
+        self.subplot_count = [1, 1, 1]
+
+    def plot_multiple_graphs_with_different_filter(self, x:str, y:str, points:int, filter:list, filter_item:str):
+        columns = math.ceil(len(filter) / 2)
+        self.subplot_count = [2, columns, 1]
+        plt.subplots_adjust(left=0.05, bottom=0.05, right=0.95, top=0.95, wspace=0.2, hspace=0.2)
+        for item in filter:
+            print(self.subplot_count)
+            self.build_plot_data(x, y, points, title=item.replace("_", " ") + " " + x.replace("_", " "), filter={filter_item:item}, show=False)
+            self.subplot_count[2] += 1
+        plt.show()
+        self.subplot_count = [1, 1, 1]
+
 
     def get_filter_options_for_column(self, column:str):
         if column in self.separate_tables:
@@ -41,7 +65,7 @@ class data_interpreter():
     def get_table_columns(self):
         return self.table.columns
 
-    def build_pie_data(self, x:str, points:int, title:str="", filter:dict=None, omit:dict=None, percentage:bool=True):
+    def build_pie_data(self, x:str, points:int, title:str="", filter:dict=None, omit:dict=None, percentage:bool=True, show:bool=True):
         query = self.build_filtered_pie_query(x, filter, omit)
         print(query)
         counts = self.database_query(query)
@@ -49,6 +73,8 @@ class data_interpreter():
         pie_data = self.get_pie_data(parsed_data[:points])
         title = self.check_title(title, x, "")
         self.pie_grapher(x.replace("_", " ").capitalize(), pie_data[1], pie_data[0], title=title, percentage=percentage)
+        if show:
+            plt.show()
         return pie_data
 
     def check_title(self, title, x, y):
@@ -97,7 +123,7 @@ class data_interpreter():
         query += ";"
         return query
 
-    def build_plot_data(self, x:str, y:str, points:int, labels:list=[], title:str="", filter:dict=None, omit:dict=None, scatter:bool=False):
+    def build_plot_data(self, x:str, y:str, points:int, labels:list=[], title:str="", filter:dict=None, omit:dict=None, scatter:bool=False, show:bool=True):
         query = self.build_filtered_query(x, y, filter, omit)
         print(query)
         frequent = self.database_query(query)
@@ -111,6 +137,8 @@ class data_interpreter():
             self.data_scatter(plot_data[0], plot_data[1], title=title, labels=labels, ylabels=plot_data[2], legend=True)
         else:
             self.data_plotter(plot_data[0], plot_data[1], title=title, labels=labels, ylabels=plot_data[2], legend=True)
+        if show:
+            plt.show()
         return plot_data
 
     def fill_in_blank_year_data(self, data):
@@ -347,6 +375,7 @@ class data_interpreter():
         database.close()
 
     def data_plotter(self, x_data:list, y_data:list, title:str, labels=[], ylabels=[], legend:bool=False):
+        plt.subplot(self.subplot_count[0], self.subplot_count[1], self.subplot_count[2])
         plt.title(title)
         if len(labels) > 0:
             plt.xlabel(labels[0])
@@ -357,23 +386,23 @@ class data_interpreter():
         for y in range(len(y_data)):
             plt.plot(x_data[y], y_data[y], label=ylabels[y])
         if legend:
-            plt.legend()
-        plt.show()
+            plt.legend(fontsize=8)
 
     def original_value_from_percent(self, pct, allvals):
         absolute = int(np.round(pct/100.*np.sum(allvals)))
         return str(absolute)
 
     def pie_grapher(self, x_name:str, x:list, labels:list, title:str, percentage:bool=True):
+        plt.subplot(self.subplot_count[0], self.subplot_count[1], self.subplot_count[2])
         plt.title(title)
         if percentage:
             wedges, texts, autotexts = plt.pie(x, autopct="%1.1f%%", startangle=0)
         else:
             wedges, texts, autotexts = plt.pie(x, autopct=lambda pct: self.original_value_from_percent(pct, x), startangle=0)
-        plt.legend(wedges, labels, title=x_name, loc="upper right")
-        plt.show()
+        plt.legend(wedges, labels, title=x_name, loc="upper right", fontsize=8)
     
     def data_scatter(self, x_data:list, y_data:list, title:str, labels=[], ylabels=[], legend:bool=False):
+        plt.subplot(self.subplot_count[0], self.subplot_count[1], self.subplot_count[2])
         plt.title(title)
         if len(labels) > 0:
             plt.xlabel(labels[0])
@@ -384,5 +413,4 @@ class data_interpreter():
         for y in range(len(y_data)):
             plt.scatter(x_data[y], y_data[y], label=ylabels[y])
         if legend:
-            plt.legend()
-        plt.show()
+            plt.legend(fontsize=8)
